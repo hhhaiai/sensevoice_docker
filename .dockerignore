@@ -1,6 +1,9 @@
 .git
 .gitignore
 .github
+docs
+README.md
+README_HF.md
 __pycache__/
 *.pyc
 *.pyo
@@ -9,3 +12,6 @@ __pycache__/
 .DS_Store
 .pytest_cache/
 .mypy_cache/
+sensevoice-small/*.part*
+sensevoice-small/model_full.onnx
+sensevoice-small/model_quant.onnx
