@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import wave
@@ -18,7 +19,20 @@ import uvicorn
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
-from funasr_onnx import SenseVoiceSmall
+try:
+    from funasr_onnx import SenseVoiceSmall
+except ModuleNotFoundError as exc:
+    # Some runtime environments (e.g. hosted containers) may skip optional deps.
+    missing_dep_installs = {
+        "jieba": "jieba>=0.42.1",
+        "torch": "torch>=2.1.0",
+    }
+    install_spec = missing_dep_installs.get(exc.name or "")
+    if install_spec:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", install_spec])
+        from funasr_onnx import SenseVoiceSmall
+    else:
+        raise
 from starlette.websockets import WebSocketState
 
 
