@@ -19,6 +19,7 @@ from fastapi import FastAPI, File, HTTPException, Request, UploadFile, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from funasr_onnx import SenseVoiceSmall
+from starlette.websockets import WebSocketState
 
 MODEL_PATH = os.getenv("MODEL_PATH", "sensevoice-small")
 HOST = os.getenv("HOST", "0.0.0.0")
@@ -145,6 +146,7 @@ class ASRService:
     def __init__(self) -> None:
         self.model: Optional[SenseVoiceSmall] = None
         self.ready = False
+        self.startup_error: Optional[str] = None
         self.started_at = time.time()
         self.model_name = "unknown"
         self.model_size_mb = 0.0
@@ -180,7 +182,13 @@ class ASRService:
         logger.info("Model ready, service listening on port %s", PORT)
 
     async def startup(self) -> None:
-        await asyncio.to_thread(self._load_sync)
+        try:
+            await asyncio.to_thread(self._load_sync)
+            self.startup_error = None
+        except Exception as exc:
+            self.ready = False
+            self.startup_error = str(exc)
+            logger.exception("Model startup failed: %s", exc)
 
     async def shutdown(self) -> None:
         self.ready = False
@@ -198,7 +206,8 @@ class ASRService:
 
     async def transcribe(self, audio: np.ndarray, language: str = "auto", use_itn: bool = False) -> dict:
         if not self.ready:
-            raise HTTPException(status_code=503, detail="Model is not ready")
+            detail = self.startup_error or "Model is not ready"
+            raise HTTPException(status_code=503, detail=detail)
         audio = np.ascontiguousarray(audio, dtype=np.float32).reshape(-1)
         if audio.size == 0:
             return {"text": "", "latency_ms": 0, "audio_duration": 0.0, "rtf": 0.0}
@@ -228,6 +237,7 @@ class ASRService:
             "model_size_mb": round(self.model_size_mb, 2),
             "uptime_sec": int(time.time() - self.started_at),
             "max_concurrent_inference": MAX_CONCURRENT_INFERENCE,
+            "startup_error": self.startup_error,
         }
 
 
@@ -374,7 +384,8 @@ async def ws_transcribe(ws: WebSocket):
                 await send_ws_result(ws, "final", final)
                 session.reset()
                 await ws.send_json({"event": "closed"})
-                break
+                await ws.close()
+                return
             elif event == "reset":
                 session.reset()
                 await ws.send_json({"event": "reset"})
@@ -391,8 +402,12 @@ async def ws_transcribe(ws: WebSocket):
         except Exception:
             pass
     finally:
-        if ws.client_state.name != "DISCONNECTED":
-            await ws.close()
+        try:
+            if ws.application_state in {WebSocketState.CONNECTED, WebSocketState.CONNECTING}:
+                await ws.close()
+        except RuntimeError:
+            # Close frame may already be sent by server/client side.
+            pass
 
 
 if __name__ == "__main__":

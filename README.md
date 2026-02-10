@@ -27,16 +27,22 @@ chmod +x auto_merge.sh
 
 ## 3. 本地运行
 
-安装依赖：
+安装服务依赖：
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-server.txt
 ```
 
 启动服务：
 
 ```bash
 python server.py
+```
+
+如果要使用命令行录音示例 `client.py`，再额外安装：
+
+```bash
+pip install -r requirements.txt
 ```
 
 访问网页：
@@ -104,8 +110,7 @@ docker compose up --build
 工作流文件：`.github/workflows/docker-ghcr.yml`
 
 触发条件：
-- 推送到 `main`
-- 推送 `v*` 标签
+- 推送任意 Git 标签（tag）
 - 手动触发 `workflow_dispatch`
 
 发布流程中会先执行：
@@ -123,6 +128,13 @@ ghcr.io/<owner>/<repo>
 使用 GHCR 镜像：
 
 ```bash
-docker pull ghcr.io/<owner>/<repo>:latest
-docker run --rm -p 8008:8008 ghcr.io/<owner>/<repo>:latest
+docker pull ghcr.io/<owner>/<repo>:<your-tag>
+docker run --rm -p 8008:8008 ghcr.io/<owner>/<repo>:<your-tag>
+```
+
+建议使用显式标签拉取，例如：
+
+```bash
+docker pull ghcr.io/<owner>/<repo>:v1.0.0
+docker run --rm -p 8008:8008 ghcr.io/<owner>/<repo>:v1.0.0
 ```
