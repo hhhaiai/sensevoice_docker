@@ -17,13 +17,21 @@ import numpy as np
 import uvicorn
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from funasr_onnx import SenseVoiceSmall
 from starlette.websockets import WebSocketState
 
+
+def env_to_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 MODEL_PATH = os.getenv("MODEL_PATH", "sensevoice-small")
 HOST = os.getenv("HOST", "0.0.0.0")
-PORT = int(os.getenv("PORT", "8008"))
+PORT = int(os.getenv("PORT", "7860"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 INTRA_THREADS = int(os.getenv("INTRA_OP_THREADS", "1"))
 MAX_CONCURRENT_INFERENCE = int(os.getenv("MAX_CONCURRENT_INFERENCE", "2"))
@@ -31,6 +39,7 @@ INFERENCE_TIMEOUT_SEC = float(os.getenv("INFERENCE_TIMEOUT_SEC", "45"))
 MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "50"))
 WS_PARTIAL_INTERVAL_SEC = float(os.getenv("WS_PARTIAL_INTERVAL_SEC", "1.2"))
 WS_MAX_BUFFER_SEC = float(os.getenv("WS_MAX_BUFFER_SEC", "30"))
+AUTO_MERGE_ON_STARTUP = env_to_bool("AUTO_MERGE_ON_STARTUP", True)
 
 SAMPLE_RATE = 16000
 MIN_PCM_BYTES = 320
@@ -167,9 +176,35 @@ class ASRService:
                 return
 
         split_candidates = list(model_dir.glob("*.onnx.part000"))
-        if split_candidates:
-            raise RuntimeError("ONNX model fragments detected. Run ./auto_merge.sh first.")
+        if split_candidates and AUTO_MERGE_ON_STARTUP:
+            self._merge_model_fragments()
+            for candidate in model_candidates:
+                if candidate.exists():
+                    self.model_name = candidate.name
+                    self.model_size_mb = candidate.stat().st_size / (1024 * 1024)
+                    self.quantize = candidate.name == "model_quant.onnx"
+                    return
+
+        if split_candidates and not AUTO_MERGE_ON_STARTUP:
+            raise RuntimeError("ONNX model fragments detected. Enable AUTO_MERGE_ON_STARTUP or run ./auto_merge.sh first.")
         raise RuntimeError(f"No model.onnx/model_quant.onnx/model_full.onnx under {model_dir.resolve()}")
+
+    def _merge_model_fragments(self) -> None:
+        workspace_root = Path(__file__).resolve().parent
+        script_path = workspace_root / "auto_merge.sh"
+        if not script_path.exists():
+            raise RuntimeError(f"Detected model fragments but {script_path} not found")
+        logger.info("Detected model fragments, running auto_merge.sh before loading model")
+        completed = subprocess.run(
+            ["bash", str(script_path)],
+            cwd=str(workspace_root),
+            capture_output=True,
+            text=True,
+        )
+        if completed.returncode != 0:
+            stderr_tail = (completed.stderr or "")[-500:]
+            raise RuntimeError(f"auto_merge.sh failed: {stderr_tail or 'unknown error'}")
+        logger.info("auto_merge.sh completed successfully")
 
     def _load_sync(self) -> None:
         self._detect_model()
@@ -301,7 +336,13 @@ async def index():
     return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
 
 
+@app.get("/favicon.ico")
+async def favicon():
+    return Response(status_code=204)
+
+
 @app.post("/api/transcribe/pcm")
+@app.post("/transcribe/pcm")
 async def transcribe_pcm(request: Request):
     body_bytes = await request.body()
     if not body_bytes or len(body_bytes) < MIN_PCM_BYTES:
@@ -318,6 +359,7 @@ async def transcribe_stream_compat(request: Request):
 
 
 @app.post("/api/transcribe/file")
+@app.post("/transcribe/file")
 async def transcribe_file(
     file: UploadFile = File(...),
     language: str = "auto",
@@ -344,6 +386,7 @@ async def send_ws_result(ws: WebSocket, event: str, result: dict) -> None:
 
 
 @app.websocket("/ws/transcribe")
+@app.websocket("/ws")
 async def ws_transcribe(ws: WebSocket):
     await ws.accept()
     language = ws.query_params.get("language", "auto")

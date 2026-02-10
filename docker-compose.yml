@@ -6,8 +6,9 @@ services:
       dockerfile: Dockerfile
     image: sensevoice-service:local
     ports:
-      - "8008:8008"
+      - "7860:7860"
     environment:
+      - PORT=7860
       - MODEL_PATH=sensevoice-small
       - LOG_LEVEL=INFO
       - MAX_CONCURRENT_INFERENCE=2

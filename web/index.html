@@ -237,7 +237,7 @@
 
     function wsUrl() {
       const scheme = location.protocol === "https:" ? "wss" : "ws";
-      return `${scheme}://${location.host}/ws/transcribe`;
+      return `${scheme}://${location.host}/ws`;
     }
 
     function stopAudioGraph() {
@@ -348,7 +348,7 @@
       const form = new FormData();
       form.append("file", file);
       try {
-        const resp = await fetch("/api/transcribe/file", { method: "POST", body: form });
+        const resp = await fetch("/transcribe/file", { method: "POST", body: form });
         const data = await resp.json();
         if (!resp.ok) {
           fileResult.textContent = `失败: ${data.detail || JSON.stringify(data)}`;

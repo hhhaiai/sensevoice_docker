@@ -48,7 +48,7 @@ pip install -r requirements.txt
 访问网页：
 
 ```text
-http://127.0.0.1:8008/
+http://127.0.0.1:7860/
 ```
 
 ## 4. API 说明
@@ -60,14 +60,16 @@ http://127.0.0.1:8008/
 ### 4.2 PCM 流转写（兼容 client.py）
 
 `POST /transcribe_stream`  
-`POST /api/transcribe/pcm`
+`POST /api/transcribe/pcm`  
+`POST /transcribe/pcm`
 
 - Header: `Content-Type: application/octet-stream`
 - Body: 16kHz 单声道 `int16` PCM 字节流
 
 ### 4.3 音频文件转写
 
-`POST /api/transcribe/file`
+`POST /api/transcribe/file`  
+`POST /transcribe/file`
 
 - `multipart/form-data`
 - 字段：`file`（音频文件）
@@ -76,7 +78,8 @@ http://127.0.0.1:8008/
 
 ### 4.4 WebSocket 实时转写
 
-`WS /ws/transcribe`
+`WS /ws/transcribe`  
+`WS /ws`
 
 - 发送二进制帧：16kHz 单声道 `int16` PCM
 - 支持文本指令：
@@ -96,7 +99,7 @@ docker build -t sensevoice-service:local .
 运行容器：
 
 ```bash
-docker run --rm -p 8008:8008 sensevoice-service:local
+docker run --rm -p 7860:7860 sensevoice-service:local
 ```
 
 或使用 compose：
@@ -129,12 +132,21 @@ ghcr.io/<owner>/<repo>
 
 ```bash
 docker pull ghcr.io/<owner>/<repo>:<your-tag>
-docker run --rm -p 8008:8008 ghcr.io/<owner>/<repo>:<your-tag>
+docker run --rm -p 7860:7860 ghcr.io/<owner>/<repo>:<your-tag>
 ```
 
 建议使用显式标签拉取，例如：
 
 ```bash
 docker pull ghcr.io/<owner>/<repo>:v1.0.0
-docker run --rm -p 8008:8008 ghcr.io/<owner>/<repo>:v1.0.0
+docker run --rm -p 7860:7860 ghcr.io/<owner>/<repo>:v1.0.0
 ```
+
+## 7. Hugging Face Spaces 兼容说明
+
+- 默认端口已调整为 `7860`（可通过环境变量 `PORT` 覆盖）
+- 不依赖 OpenAI 风格路径，不需要 `/v1/*`
+- 推荐在 Spaces 使用这些路径：
+  - `POST /transcribe/file`
+  - `POST /transcribe/pcm`
+  - `WS /ws`

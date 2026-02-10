@@ -3,9 +3,10 @@ import requests
 import time
 import threading
 import re
+import os
 
 # --- 配置 ---
-SERVER_URL = "http://127.0.0.1:8008/transcribe_stream"
+SERVER_URL = os.getenv("SERVER_URL", "http://127.0.0.1:7860/transcribe_stream")
 CHUNK = 1024
 FORMAT = pyaudio.paInt16
 CHANNELS = 1

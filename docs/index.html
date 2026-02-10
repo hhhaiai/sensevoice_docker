@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SenseVoice Demo (GitHub Pages)</title>
+  <style>
+    :root {
+      --bg: #f3f6f9;
+      --card: #fff;
+      --line: #dbe5ec;
+      --text: #163040;
+      --muted: #5c7382;
+      --accent: #0f766e;
+      --accent-2: #d7f5ef;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at right top, #d6ece6 0%, var(--bg) 55%);
+      min-height: 100vh;
+    }
+    .container { max-width: 960px; margin: 0 auto; padding: 24px 16px 40px; }
+    h1 { margin: 0 0 8px; font-size: 30px; }
+    .desc { margin: 0 0 18px; color: var(--muted); }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 14px;
+      box-shadow: 0 10px 26px rgba(12, 40, 53, .06);
+    }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+    input, textarea, button {
+      font-size: 14px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      padding: 10px;
+    }
+    #baseUrl { width: 100%; }
+    button {
+      border: 0;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button.secondary { background: #eaf1f6; color: #244556; }
+    .status {
+      display: inline-block;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: var(--accent-2);
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    textarea { width: 100%; min-height: 120px; resize: vertical; }
+    pre {
+      margin: 6px 0 0;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #f9fcfe;
+      white-space: pre-wrap;
+      word-break: break-word;
+      min-height: 72px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>SenseVoice 在线体验</h1>
+    <p class="desc">此页面部署在 GitHub Pages，后端部署在 Hugging Face Spaces。</p>
+
+    <section class="card">
+      <div class="row">
+        <label for="baseUrl"><b>后端地址 (HF Space URL)</b></label>
+      </div>
+      <div class="row">
+        <input id="baseUrl" placeholder="https://your-space-name.hf.space">
+      </div>
+      <div class="row">
+        <button id="saveBtn" type="button">保存地址</button>
+        <span class="status" id="health">未检测</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h3>音频文件转写</h3>
+      <div class="row">
+        <input id="audioFile" type="file" accept="audio/*">
+        <button id="fileBtn" type="button">上传并转写</button>
+      </div>
+      <pre id="fileResult"></pre>
+    </section>
+
+    <section class="card">
+      <h3>实时语音转写</h3>
+      <div class="row">
+        <button id="startBtn" type="button">开始录音</button>
+        <button id="stopBtn" class="secondary" type="button">停止并输出</button>
+      </div>
+      <label>实时文本</label>
+      <textarea id="partialText" readonly></textarea>
+      <label>最终文本</label>
+      <textarea id="finalText" readonly></textarea>
+    </section>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const baseUrlInput = $("baseUrl");
+    const saveBtn = $("saveBtn");
+    const health = $("health");
+    const audioFile = $("audioFile");
+    const fileBtn = $("fileBtn");
+    const fileResult = $("fileResult");
+    const startBtn = $("startBtn");
+    const stopBtn = $("stopBtn");
+    const partialText = $("partialText");
+    const finalText = $("finalText");
+
+    let ws = null;
+    let mediaStream = null;
+    let audioContext = null;
+    let sourceNode = null;
+    let processorNode = null;
+
+    function getBaseUrl() {
+      const v = baseUrlInput.value.trim().replace(/\/+$/, "");
+      if (!v) throw new Error("请先填写后端地址");
+      return v;
+    }
+
+    function toWsUrl(httpUrl) {
+      return httpUrl.replace(/^http:\/\//i, "ws://").replace(/^https:\/\//i, "wss://");
+    }
+
+    function downsample(input, fromRate, toRate) {
+      if (fromRate === toRate) return input;
+      const ratio = fromRate / toRate;
+      const outLength = Math.round(input.length / ratio);
+      const out = new Float32Array(outLength);
+      let pos = 0;
+      let idx = 0;
+      while (pos < outLength) {
+        const next = Math.round((pos + 1) * ratio);
+        let sum = 0;
+        let cnt = 0;
+        for (let i = idx; i < next && i < input.length; i += 1) {
+          sum += input[i];
+          cnt += 1;
+        }
+        out[pos] = cnt ? sum / cnt : 0;
+        pos += 1;
+        idx = next;
+      }
+      return out;
+    }
+
+    function floatToPcm16(floatBuf) {
+      const out = new Int16Array(floatBuf.length);
+      for (let i = 0; i < floatBuf.length; i += 1) {
+        const s = Math.max(-1, Math.min(1, floatBuf[i]));
+        out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+      }
+      return out;
+    }
+
+    async function checkHealth() {
+      try {
+        const base = getBaseUrl();
+        const resp = await fetch(`${base}/health`);
+        const data = await resp.json();
+        health.textContent = resp.ok && data.ready ? "服务正常" : "服务未就绪";
+      } catch (e) {
+        health.textContent = `不可达: ${e.message}`;
+      }
+    }
+
+    async function uploadFile() {
+      try {
+        const base = getBaseUrl();
+        const file = audioFile.files && audioFile.files[0];
+        if (!file) throw new Error("请先选择音频文件");
+        fileResult.textContent = "处理中...";
+        const formData = new FormData();
+        formData.append("file", file);
+        const resp = await fetch(`${base}/transcribe/file`, { method: "POST", body: formData });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.detail || JSON.stringify(data));
+        fileResult.textContent = data.text || "";
+      } catch (e) {
+        fileResult.textContent = `失败: ${e.message}`;
+      }
+    }
+
+    async function startRealtime() {
+      const base = getBaseUrl();
+      partialText.value = "";
+      finalText.value = "";
+      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      sourceNode = audioContext.createMediaStreamSource(mediaStream);
+      processorNode = audioContext.createScriptProcessor(4096, 1, 1);
+      const gain = audioContext.createGain();
+      gain.gain.value = 0;
+
+      ws = new WebSocket(`${toWsUrl(base)}/ws`);
+      ws.binaryType = "arraybuffer";
+      ws.onmessage = (evt) => {
+        try {
+          const data = JSON.parse(evt.data);
+          if (data.event === "partial") partialText.value = data.text || "";
+          if (data.event === "final") {
+            finalText.value = finalText.value ? `${finalText.value}\n${data.text || ""}` : (data.text || "");
+            partialText.value = "";
+          }
+        } catch (e) {}
+      };
+
+      processorNode.onaudioprocess = (event) => {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        const input = event.inputBuffer.getChannelData(0);
+        const d = downsample(input, audioContext.sampleRate, 16000);
+        const pcm16 = floatToPcm16(d);
+        ws.send(pcm16.buffer);
+      };
+
+      sourceNode.connect(processorNode);
+      processorNode.connect(gain);
+      gain.connect(audioContext.destination);
+    }
+
+    function stopRealtime() {
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ event: "end" }));
+      if (processorNode) processorNode.disconnect();
+      if (sourceNode) sourceNode.disconnect();
+      if (mediaStream) mediaStream.getTracks().forEach((t) => t.stop());
+      if (audioContext) audioContext.close();
+      processorNode = null;
+      sourceNode = null;
+      mediaStream = null;
+      audioContext = null;
+      if (ws && ws.readyState === WebSocket.OPEN) ws.close();
+      ws = null;
+    }
+
+    const saved = localStorage.getItem("sensevoice_base_url");
+    if (saved) baseUrlInput.value = saved;
+    saveBtn.onclick = () => {
+      localStorage.setItem("sensevoice_base_url", baseUrlInput.value.trim());
+      checkHealth();
+    };
+    fileBtn.onclick = uploadFile;
+    startBtn.onclick = startRealtime;
+    stopBtn.onclick = stopRealtime;
+    if (saved) checkHealth();
+  </script>
+</body>
+</html>

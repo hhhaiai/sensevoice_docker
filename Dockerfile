@@ -3,7 +3,7 @@ FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     MODEL_PATH=sensevoice-small \
-    PORT=8008 \
+    PORT=7860 \
     LOG_LEVEL=INFO
 
 WORKDIR /app
@@ -17,6 +17,6 @@ RUN pip install --no-cache-dir -r requirements-server.txt
 
 COPY . .
 
-EXPOSE 8008
+EXPOSE 7860
 
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8008", "--log-level", "info"]
+CMD ["python", "server.py"]
