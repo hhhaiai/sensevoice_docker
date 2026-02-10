@@ -63,10 +63,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
-        id: buildx
         uses: docker/setup-buildx-action@v3
-        with:
-          buildkitd-flags: --oci-worker-gc --oci-worker-gc-keepstorage=8GB
 
       - name: Verify available disk space
         run: |
@@ -102,7 +99,6 @@ jobs:
           file: ./Dockerfile
           push: true
           platforms: ${{ matrix.platform }}
-          builder: ${{ steps.buildx.outputs.name }}
           tags: |
             ${{ env.IMAGE_NAME }}:${{ env.TAG_NAME }}-${{ matrix.arch_suffix }}
             ${{ env.IMAGE_NAME }}:${{ env.SHA_TAG }}-${{ matrix.arch_suffix }}
