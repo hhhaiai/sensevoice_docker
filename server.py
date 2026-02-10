@@ -48,6 +48,7 @@ HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "7860"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 INTRA_THREADS = int(os.getenv("INTRA_OP_THREADS", "1"))
+DEFAULT_USE_ITN = env_to_bool("DEFAULT_USE_ITN", True)
 MAX_CONCURRENT_INFERENCE = int(os.getenv("MAX_CONCURRENT_INFERENCE", "2"))
 INFERENCE_TIMEOUT_SEC = float(os.getenv("INFERENCE_TIMEOUT_SEC", "45"))
 MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "50"))
@@ -226,7 +227,8 @@ class ASRService:
         self.model = SenseVoiceSmall(model_dir=MODEL_PATH, quantize=self.quantize, intra_op_num_threads=INTRA_THREADS)
         logger.info("Warming up model with 1-second dummy audio")
         dummy = np.zeros(SAMPLE_RATE, dtype=np.float32)
-        self.model(dummy, language="auto", use_itn=False)
+        warmup_textnorm = "withitn" if DEFAULT_USE_ITN else "woitn"
+        self.model(dummy, language="auto", textnorm=warmup_textnorm)
         self.ready = True
         logger.info("Model ready, service listening on port %s", PORT)
 
@@ -246,7 +248,8 @@ class ASRService:
     def _infer_sync(self, audio: np.ndarray, language: str, use_itn: bool) -> str:
         if self.model is None:
             raise RuntimeError("Model not loaded")
-        result = self.model(audio, language=language, use_itn=use_itn)
+        textnorm = "withitn" if use_itn else "woitn"
+        result = self.model(audio, language=language, textnorm=textnorm)
         if isinstance(result, list):
             text = result[0] if result else ""
         else:
@@ -362,7 +365,7 @@ async def transcribe_pcm(request: Request):
     if not body_bytes or len(body_bytes) < MIN_PCM_BYTES:
         return {"text": "", "latency_ms": 0, "audio_duration": 0.0, "rtf": 0.0}
     language = request.query_params.get("language", "auto")
-    use_itn = str_to_bool(request.query_params.get("use_itn", "false"))
+    use_itn = str_to_bool(request.query_params.get("use_itn", str(DEFAULT_USE_ITN).lower()))
     audio = pcm16_bytes_to_float32(body_bytes)
     return await asr_service.transcribe(audio, language=language, use_itn=use_itn)
 
@@ -377,7 +380,7 @@ async def transcribe_stream_compat(request: Request):
 async def transcribe_file(
     file: UploadFile = File(...),
     language: str = "auto",
-    use_itn: bool = False,
+    use_itn: Optional[bool] = None,
 ):
     payload = await file.read()
     if not payload:
@@ -388,6 +391,8 @@ async def transcribe_file(
         audio = await asyncio.to_thread(decode_audio_via_ffmpeg, payload, file.filename or "audio.bin")
     except RuntimeError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if use_itn is None:
+        use_itn = DEFAULT_USE_ITN
     result = await asr_service.transcribe(audio, language=language, use_itn=use_itn)
     result["filename"] = file.filename
     return result
@@ -404,7 +409,7 @@ async def send_ws_result(ws: WebSocket, event: str, result: dict) -> None:
 async def ws_transcribe(ws: WebSocket):
     await ws.accept()
     language = ws.query_params.get("language", "auto")
-    use_itn = str_to_bool(ws.query_params.get("use_itn", "false"))
+    use_itn = str_to_bool(ws.query_params.get("use_itn", str(DEFAULT_USE_ITN).lower()))
     session = StreamSession.create()
     try:
         await ws.send_json({"event": "ready", "sample_rate": SAMPLE_RATE})
