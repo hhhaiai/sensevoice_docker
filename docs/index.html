@@ -3,263 +3,534 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SenseVoice Demo (GitHub Pages)</title>
+  <title>SenseVoice Live Demo</title>
   <style>
     :root {
-      --bg: #f3f6f9;
-      --card: #fff;
-      --line: #dbe5ec;
-      --text: #163040;
-      --muted: #5c7382;
+      --bg-1: #edf4f8;
+      --bg-2: #dbeee8;
+      --card: #ffffff;
+      --text: #102532;
+      --muted: #536977;
+      --line: #d7e4eb;
       --accent: #0f766e;
-      --accent-2: #d7f5ef;
+      --accent-soft: #dbf5ef;
+      --warn: #b54708;
+      --error: #b42318;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+      background: radial-gradient(circle at top right, var(--bg-2) 0%, var(--bg-1) 54%);
       color: var(--text);
-      background: radial-gradient(circle at right top, #d6ece6 0%, var(--bg) 55%);
       min-height: 100vh;
     }
-    .container { max-width: 960px; margin: 0 auto; padding: 24px 16px 40px; }
-    h1 { margin: 0 0 8px; font-size: 30px; }
-    .desc { margin: 0 0 18px; color: var(--muted); }
-    .card {
+    .wrap {
+      max-width: 1140px;
+      margin: 0 auto;
+      padding: 24px 16px 42px;
+    }
+    .hero {
+      background: linear-gradient(120deg, #0f766e, #115e59);
+      border-radius: 16px;
+      padding: 20px;
+      color: #e8fffb;
+      box-shadow: 0 14px 34px rgba(9, 45, 52, 0.22);
+      margin-bottom: 16px;
+    }
+    .hero h1 {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.2;
+    }
+    .hero p {
+      margin: 9px 0 0;
+      font-size: 14px;
+      opacity: .92;
+    }
+    .panel {
       background: var(--card);
       border: 1px solid var(--line);
-      border-radius: 12px;
+      border-radius: 14px;
       padding: 14px;
-      margin-bottom: 14px;
-      box-shadow: 0 10px 26px rgba(12, 40, 53, .06);
+      margin-bottom: 12px;
+      box-shadow: 0 10px 26px rgba(14, 42, 54, 0.06);
     }
-    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
-    input, textarea, button {
-      font-size: 14px;
-      border-radius: 8px;
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    @media (min-width: 920px) {
+      .grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    .title {
+      margin: 0 0 10px;
+      font-size: 18px;
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .field {
+      width: 100%;
       border: 1px solid var(--line);
-      padding: 10px;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #fdfefe;
+      color: var(--text);
+      font-size: 14px;
     }
-    #baseUrl { width: 100%; }
     button {
       border: 0;
-      background: var(--accent);
-      color: #fff;
-      font-weight: 600;
+      border-radius: 10px;
+      padding: 9px 13px;
+      font-size: 13px;
+      font-weight: 700;
       cursor: pointer;
+      transition: transform .06s ease;
     }
-    button.secondary { background: #eaf1f6; color: #244556; }
-    .status {
-      display: inline-block;
+    button:active { transform: translateY(1px); }
+    .btn-main { background: var(--accent); color: #fff; }
+    .btn-sub { background: #e8f0f4; color: #234152; }
+    .btn-warn { background: #fef0db; color: var(--warn); }
+    .status-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .chip {
       padding: 5px 10px;
       border-radius: 999px;
-      background: var(--accent-2);
-      color: var(--accent);
       font-size: 12px;
-      font-weight: 700;
-    }
-    textarea { width: 100%; min-height: 120px; resize: vertical; }
-    pre {
-      margin: 6px 0 0;
-      padding: 10px;
-      border-radius: 8px;
       border: 1px solid var(--line);
-      background: #f9fcfe;
+      background: #f8fcff;
+      color: #36566a;
+    }
+    .chip.ok { background: var(--accent-soft); color: var(--accent); border-color: #b9ecdf; }
+    .chip.err { background: #fee4e2; color: var(--error); border-color: #fec5c0; }
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+    textarea, pre {
+      width: 100%;
+      min-height: 110px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fbfeff;
+      color: #142f3e;
+      padding: 10px;
+      font-size: 13px;
+      line-height: 1.5;
       white-space: pre-wrap;
       word-break: break-word;
-      min-height: 72px;
+      margin: 8px 0 0;
+    }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+    }
+    .log {
+      max-height: 220px;
+      overflow: auto;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>SenseVoice 在线体验</h1>
-    <p class="desc">此页面部署在 GitHub Pages，后端部署在 Hugging Face Spaces。</p>
-
-    <section class="card">
-      <div class="row">
-        <label for="baseUrl"><b>后端地址 (HF Space URL)</b></label>
-      </div>
-      <div class="row">
-        <input id="baseUrl" placeholder="https://your-space-name.hf.space">
-      </div>
-      <div class="row">
-        <button id="saveBtn" type="button">保存地址</button>
-        <span class="status" id="health">未检测</span>
-      </div>
+  <div class="wrap">
+    <section class="hero">
+      <h1>SenseVoice 公开体验页</h1>
+      <p>GitHub Pages 前端 + Hugging Face Spaces 后端。支持文件语音转写、实时语音转写、接口冒烟验证。</p>
     </section>
 
-    <section class="card">
-      <h3>音频文件转写</h3>
+    <section class="panel">
+      <h2 class="title">后端配置与状态</h2>
       <div class="row">
-        <input id="audioFile" type="file" accept="audio/*">
-        <button id="fileBtn" type="button">上传并转写</button>
+        <input id="baseUrl" class="field" placeholder="https://sanbo1200-sensevoice.hf.space">
       </div>
-      <pre id="fileResult"></pre>
+      <div class="row">
+        <button id="saveBtn" class="btn-main" type="button">保存后端地址</button>
+        <button id="healthBtn" class="btn-sub" type="button">检查健康状态</button>
+        <button id="pcmBtn" class="btn-sub" type="button">PCM 接口自检</button>
+      </div>
+      <div class="status-bar">
+        <span id="readyChip" class="chip">Ready: unknown</span>
+        <span id="modelChip" class="chip">Model: -</span>
+        <span id="uptimeChip" class="chip">Uptime: -</span>
+      </div>
+      <p id="statusText" class="hint">请先保存后端地址，然后检查健康状态。</p>
     </section>
 
-    <section class="card">
-      <h3>实时语音转写</h3>
+    <div class="grid">
+      <section class="panel">
+        <h2 class="title">音频文件转写</h2>
+        <div class="row">
+          <input id="audioFile" type="file" class="field" accept="audio/*">
+        </div>
+        <div class="row">
+          <button id="fileBtn" class="btn-main" type="button">上传并转写</button>
+        </div>
+        <p id="fileMetrics" class="hint"></p>
+        <pre id="fileResult"></pre>
+      </section>
+
+      <section class="panel">
+        <h2 class="title">实时语音转写</h2>
+        <div class="row">
+          <button id="startBtn" class="btn-main" type="button">开始录音</button>
+          <button id="stopBtn" class="btn-warn" type="button">停止并输出最终结果</button>
+          <button id="resetBtn" class="btn-sub" type="button">重置会话</button>
+        </div>
+        <p id="liveMetrics" class="hint">未开始</p>
+        <label>实时文本：</label>
+        <textarea id="partialText" readonly></textarea>
+        <label>最终文本：</label>
+        <textarea id="finalText" readonly></textarea>
+      </section>
+    </div>
+
+    <section class="panel">
+      <h2 class="title">接口示例 (curl)</h2>
       <div class="row">
-        <button id="startBtn" type="button">开始录音</button>
-        <button id="stopBtn" class="secondary" type="button">停止并输出</button>
+        <button id="copyHealth" class="btn-sub" type="button">复制 Health 命令</button>
+        <button id="copyFile" class="btn-sub" type="button">复制文件转写命令</button>
       </div>
-      <label>实时文本</label>
-      <textarea id="partialText" readonly></textarea>
-      <label>最终文本</label>
-      <textarea id="finalText" readonly></textarea>
+      <pre id="curlPreview" class="mono"></pre>
+    </section>
+
+    <section class="panel">
+      <h2 class="title">运行日志</h2>
+      <pre id="logBox" class="log mono"></pre>
     </section>
   </div>
 
   <script>
-    const $ = (id) => document.getElementById(id);
-    const baseUrlInput = $("baseUrl");
-    const saveBtn = $("saveBtn");
-    const health = $("health");
-    const audioFile = $("audioFile");
-    const fileBtn = $("fileBtn");
-    const fileResult = $("fileResult");
-    const startBtn = $("startBtn");
-    const stopBtn = $("stopBtn");
-    const partialText = $("partialText");
-    const finalText = $("finalText");
+    const DEFAULT_BASE_URL = "https://sanbo1200-sensevoice.hf.space";
 
-    let ws = null;
-    let mediaStream = null;
+    const byId = (id) => document.getElementById(id);
+    const baseUrlInput = byId("baseUrl");
+    const saveBtn = byId("saveBtn");
+    const healthBtn = byId("healthBtn");
+    const pcmBtn = byId("pcmBtn");
+    const readyChip = byId("readyChip");
+    const modelChip = byId("modelChip");
+    const uptimeChip = byId("uptimeChip");
+    const statusText = byId("statusText");
+    const audioFile = byId("audioFile");
+    const fileBtn = byId("fileBtn");
+    const fileMetrics = byId("fileMetrics");
+    const fileResult = byId("fileResult");
+    const startBtn = byId("startBtn");
+    const stopBtn = byId("stopBtn");
+    const resetBtn = byId("resetBtn");
+    const partialText = byId("partialText");
+    const finalText = byId("finalText");
+    const liveMetrics = byId("liveMetrics");
+    const curlPreview = byId("curlPreview");
+    const copyHealth = byId("copyHealth");
+    const copyFile = byId("copyFile");
+    const logBox = byId("logBox");
+
     let audioContext = null;
+    let mediaStream = null;
     let sourceNode = null;
     let processorNode = null;
+    let websocket = null;
 
-    function getBaseUrl() {
-      const v = baseUrlInput.value.trim().replace(/\/+$/, "");
-      if (!v) throw new Error("请先填写后端地址");
-      return v;
+    function nowTime() {
+      return new Date().toLocaleTimeString("zh-CN", { hour12: false });
     }
 
-    function toWsUrl(httpUrl) {
-      return httpUrl.replace(/^http:\/\//i, "ws://").replace(/^https:\/\//i, "wss://");
+    function log(msg) {
+      logBox.textContent = `[${nowTime()}] ${msg}\n` + logBox.textContent;
     }
 
-    function downsample(input, fromRate, toRate) {
-      if (fromRate === toRate) return input;
-      const ratio = fromRate / toRate;
-      const outLength = Math.round(input.length / ratio);
-      const out = new Float32Array(outLength);
-      let pos = 0;
-      let idx = 0;
-      while (pos < outLength) {
-        const next = Math.round((pos + 1) * ratio);
-        let sum = 0;
-        let cnt = 0;
-        for (let i = idx; i < next && i < input.length; i += 1) {
-          sum += input[i];
-          cnt += 1;
-        }
-        out[pos] = cnt ? sum / cnt : 0;
-        pos += 1;
-        idx = next;
+    function normalizeBaseUrl(v) {
+      return (v || "").trim().replace(/\/+$/, "");
+    }
+
+    function currentBaseUrl() {
+      const val = normalizeBaseUrl(baseUrlInput.value);
+      if (!val) throw new Error("请先填写后端地址");
+      return val;
+    }
+
+    function wsBaseUrl(httpUrl) {
+      return httpUrl.replace(/^https:\/\//i, "wss://").replace(/^http:\/\//i, "ws://");
+    }
+
+    function setReadyChip(isReady) {
+      readyChip.classList.remove("ok", "err");
+      if (isReady === true) {
+        readyChip.textContent = "Ready: true";
+        readyChip.classList.add("ok");
+      } else if (isReady === false) {
+        readyChip.textContent = "Ready: false";
+        readyChip.classList.add("err");
+      } else {
+        readyChip.textContent = "Ready: unknown";
       }
-      return out;
     }
 
-    function floatToPcm16(floatBuf) {
-      const out = new Int16Array(floatBuf.length);
-      for (let i = 0; i < floatBuf.length; i += 1) {
-        const s = Math.max(-1, Math.min(1, floatBuf[i]));
+    function updateCurlPreview() {
+      const base = normalizeBaseUrl(baseUrlInput.value) || DEFAULT_BASE_URL;
+      const sample =
+`curl -sS ${base}/health
+curl -sS -X POST ${base}/transcribe/file -F "file=@demo.wav;type=audio/wav"`;
+      curlPreview.textContent = sample;
+    }
+
+    async function checkHealth() {
+      try {
+        const base = currentBaseUrl();
+        statusText.textContent = "正在检查服务状态...";
+        const resp = await fetch(`${base}/health`, { method: "GET" });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(JSON.stringify(data));
+        setReadyChip(Boolean(data.ready));
+        modelChip.textContent = `Model: ${data.model_name || "-"}`;
+        uptimeChip.textContent = `Uptime: ${data.uptime_sec || 0}s`;
+        statusText.textContent = data.ready ? "服务可用" : `服务未就绪: ${data.startup_error || "unknown"}`;
+        log(`Health ok, ready=${data.ready}, model=${data.model_name}`);
+      } catch (err) {
+        setReadyChip(false);
+        statusText.textContent = `健康检查失败: ${err.message}`;
+        log(`Health failed: ${err.message}`);
+      }
+    }
+
+    async function checkPcmEndpoint() {
+      try {
+        const base = currentBaseUrl();
+        statusText.textContent = "正在做 PCM 接口自检...";
+        const pcm = new Int16Array(16000);
+        const resp = await fetch(`${base}/transcribe/pcm`, {
+          method: "POST",
+          headers: { "Content-Type": "application/octet-stream" },
+          body: pcm.buffer
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.detail || JSON.stringify(data));
+        statusText.textContent = `PCM 自检通过 | latency=${data.latency_ms}ms | rtf=${data.rtf}`;
+        log(`PCM ok, latency=${data.latency_ms}ms, text=${data.text || ""}`);
+      } catch (err) {
+        statusText.textContent = `PCM 自检失败: ${err.message}`;
+        log(`PCM failed: ${err.message}`);
+      }
+    }
+
+    async function transcribeFile() {
+      const file = audioFile.files && audioFile.files[0];
+      if (!file) {
+        fileResult.textContent = "请先选择音频文件";
+        return;
+      }
+      try {
+        const base = currentBaseUrl();
+        fileBtn.disabled = true;
+        fileResult.textContent = "处理中...";
+        fileMetrics.textContent = "";
+        const formData = new FormData();
+        formData.append("file", file);
+        const resp = await fetch(`${base}/transcribe/file`, {
+          method: "POST",
+          body: formData
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.detail || JSON.stringify(data));
+        fileResult.textContent = data.text || "";
+        fileMetrics.textContent = `filename=${data.filename || file.name} | duration=${data.audio_duration}s | latency=${data.latency_ms}ms | rtf=${data.rtf}`;
+        log(`File ok, name=${data.filename || file.name}, latency=${data.latency_ms}ms`);
+      } catch (err) {
+        fileResult.textContent = `失败: ${err.message}`;
+        log(`File failed: ${err.message}`);
+      } finally {
+        fileBtn.disabled = false;
+      }
+    }
+
+    function downsampleBuffer(buffer, inputRate, targetRate) {
+      if (targetRate === inputRate) return buffer;
+      const ratio = inputRate / targetRate;
+      const newLength = Math.round(buffer.length / ratio);
+      const result = new Float32Array(newLength);
+      let offsetResult = 0;
+      let offsetBuffer = 0;
+      while (offsetResult < result.length) {
+        const nextOffsetBuffer = Math.round((offsetResult + 1) * ratio);
+        let sum = 0;
+        let count = 0;
+        for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i += 1) {
+          sum += buffer[i];
+          count += 1;
+        }
+        result[offsetResult] = count > 0 ? (sum / count) : 0;
+        offsetResult += 1;
+        offsetBuffer = nextOffsetBuffer;
+      }
+      return result;
+    }
+
+    function floatToPCM16(float32Array) {
+      const out = new Int16Array(float32Array.length);
+      for (let i = 0; i < float32Array.length; i += 1) {
+        const s = Math.max(-1, Math.min(1, float32Array[i]));
         out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
       }
       return out;
     }
 
-    async function checkHealth() {
-      try {
-        const base = getBaseUrl();
-        const resp = await fetch(`${base}/health`);
-        const data = await resp.json();
-        health.textContent = resp.ok && data.ready ? "服务正常" : "服务未就绪";
-      } catch (e) {
-        health.textContent = `不可达: ${e.message}`;
+    function stopAudioGraph() {
+      if (processorNode) {
+        processorNode.disconnect();
+        processorNode.onaudioprocess = null;
+        processorNode = null;
       }
-    }
-
-    async function uploadFile() {
-      try {
-        const base = getBaseUrl();
-        const file = audioFile.files && audioFile.files[0];
-        if (!file) throw new Error("请先选择音频文件");
-        fileResult.textContent = "处理中...";
-        const formData = new FormData();
-        formData.append("file", file);
-        const resp = await fetch(`${base}/transcribe/file`, { method: "POST", body: formData });
-        const data = await resp.json();
-        if (!resp.ok) throw new Error(data.detail || JSON.stringify(data));
-        fileResult.textContent = data.text || "";
-      } catch (e) {
-        fileResult.textContent = `失败: ${e.message}`;
+      if (sourceNode) {
+        sourceNode.disconnect();
+        sourceNode = null;
+      }
+      if (mediaStream) {
+        mediaStream.getTracks().forEach((track) => track.stop());
+        mediaStream = null;
+      }
+      if (audioContext) {
+        audioContext.close();
+        audioContext = null;
       }
     }
 
     async function startRealtime() {
-      const base = getBaseUrl();
-      partialText.value = "";
-      finalText.value = "";
-      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      sourceNode = audioContext.createMediaStreamSource(mediaStream);
-      processorNode = audioContext.createScriptProcessor(4096, 1, 1);
-      const gain = audioContext.createGain();
-      gain.gain.value = 0;
+      try {
+        if (websocket && websocket.readyState === WebSocket.OPEN) return;
+        partialText.value = "";
+        finalText.value = "";
+        liveMetrics.textContent = "正在建立实时连接...";
+        const base = currentBaseUrl();
 
-      ws = new WebSocket(`${toWsUrl(base)}/ws`);
-      ws.binaryType = "arraybuffer";
-      ws.onmessage = (evt) => {
-        try {
-          const data = JSON.parse(evt.data);
-          if (data.event === "partial") partialText.value = data.text || "";
-          if (data.event === "final") {
-            finalText.value = finalText.value ? `${finalText.value}\n${data.text || ""}` : (data.text || "");
-            partialText.value = "";
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        sourceNode = audioContext.createMediaStreamSource(mediaStream);
+        processorNode = audioContext.createScriptProcessor(4096, 1, 1);
+        const silentGain = audioContext.createGain();
+        silentGain.gain.value = 0;
+
+        websocket = new WebSocket(`${wsBaseUrl(base)}/ws`);
+        websocket.binaryType = "arraybuffer";
+        websocket.onopen = () => {
+          liveMetrics.textContent = "实时转写中";
+          log("WebSocket connected");
+        };
+        websocket.onclose = () => {
+          liveMetrics.textContent = "连接已关闭";
+          log("WebSocket closed");
+        };
+        websocket.onerror = () => {
+          liveMetrics.textContent = "WebSocket 连接错误";
+          log("WebSocket error");
+        };
+        websocket.onmessage = (evt) => {
+          try {
+            const data = JSON.parse(evt.data);
+            if (data.event === "partial") {
+              partialText.value = data.text || "";
+              liveMetrics.textContent = `实时中 | latency=${data.latency_ms || 0}ms | rtf=${data.rtf || 0}`;
+            } else if (data.event === "final") {
+              const prev = finalText.value ? `${finalText.value}\n` : "";
+              finalText.value = `${prev}${data.text || ""}`.trim();
+              partialText.value = "";
+            } else if (data.event === "error") {
+              liveMetrics.textContent = `错误: ${data.detail || "unknown"}`;
+              log(`WS error: ${data.detail || "unknown"}`);
+            }
+          } catch (err) {
+            log(`WS parse error: ${err.message}`);
           }
-        } catch (e) {}
-      };
+        };
 
-      processorNode.onaudioprocess = (event) => {
-        if (!ws || ws.readyState !== WebSocket.OPEN) return;
-        const input = event.inputBuffer.getChannelData(0);
-        const d = downsample(input, audioContext.sampleRate, 16000);
-        const pcm16 = floatToPcm16(d);
-        ws.send(pcm16.buffer);
-      };
+        processorNode.onaudioprocess = (event) => {
+          if (!websocket || websocket.readyState !== WebSocket.OPEN) return;
+          const input = event.inputBuffer.getChannelData(0);
+          const downsampled = downsampleBuffer(input, audioContext.sampleRate, 16000);
+          const pcm = floatToPCM16(downsampled);
+          websocket.send(pcm.buffer);
+        };
 
-      sourceNode.connect(processorNode);
-      processorNode.connect(gain);
-      gain.connect(audioContext.destination);
+        sourceNode.connect(processorNode);
+        processorNode.connect(silentGain);
+        silentGain.connect(audioContext.destination);
+      } catch (err) {
+        liveMetrics.textContent = `启动失败: ${err.message}`;
+        log(`Realtime start failed: ${err.message}`);
+      }
     }
 
     function stopRealtime() {
-      if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ event: "end" }));
-      if (processorNode) processorNode.disconnect();
-      if (sourceNode) sourceNode.disconnect();
-      if (mediaStream) mediaStream.getTracks().forEach((t) => t.stop());
-      if (audioContext) audioContext.close();
-      processorNode = null;
-      sourceNode = null;
-      mediaStream = null;
-      audioContext = null;
-      if (ws && ws.readyState === WebSocket.OPEN) ws.close();
-      ws = null;
+      try {
+        if (websocket && websocket.readyState === WebSocket.OPEN) {
+          websocket.send(JSON.stringify({ event: "end" }));
+          setTimeout(() => {
+            if (websocket && websocket.readyState === WebSocket.OPEN) websocket.close();
+          }, 140);
+        }
+        stopAudioGraph();
+      } finally {
+        websocket = null;
+      }
     }
 
-    const saved = localStorage.getItem("sensevoice_base_url");
-    if (saved) baseUrlInput.value = saved;
-    saveBtn.onclick = () => {
-      localStorage.setItem("sensevoice_base_url", baseUrlInput.value.trim());
-      checkHealth();
-    };
-    fileBtn.onclick = uploadFile;
-    startBtn.onclick = startRealtime;
-    stopBtn.onclick = stopRealtime;
-    if (saved) checkHealth();
+    function resetRealtime() {
+      partialText.value = "";
+      finalText.value = "";
+      liveMetrics.textContent = "会话已重置";
+      if (websocket && websocket.readyState === WebSocket.OPEN) {
+        websocket.send(JSON.stringify({ event: "reset" }));
+      }
+    }
+
+    async function copyText(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        statusText.textContent = "命令已复制到剪贴板";
+      } catch (err) {
+        statusText.textContent = "复制失败，请手动复制";
+      }
+    }
+
+    saveBtn.addEventListener("click", () => {
+      const saved = normalizeBaseUrl(baseUrlInput.value);
+      localStorage.setItem("sensevoice_demo_base_url", saved);
+      updateCurlPreview();
+      statusText.textContent = `后端地址已保存: ${saved}`;
+      log(`Base URL saved: ${saved}`);
+    });
+    healthBtn.addEventListener("click", checkHealth);
+    pcmBtn.addEventListener("click", checkPcmEndpoint);
+    fileBtn.addEventListener("click", transcribeFile);
+    startBtn.addEventListener("click", startRealtime);
+    stopBtn.addEventListener("click", stopRealtime);
+    resetBtn.addEventListener("click", resetRealtime);
+    copyHealth.addEventListener("click", () => {
+      const base = normalizeBaseUrl(baseUrlInput.value) || DEFAULT_BASE_URL;
+      copyText(`curl -sS ${base}/health`);
+    });
+    copyFile.addEventListener("click", () => {
+      const base = normalizeBaseUrl(baseUrlInput.value) || DEFAULT_BASE_URL;
+      copyText(`curl -sS -X POST ${base}/transcribe/file -F "file=@demo.wav;type=audio/wav"`);
+    });
+
+    const savedUrl = localStorage.getItem("sensevoice_demo_base_url");
+    baseUrlInput.value = normalizeBaseUrl(savedUrl) || DEFAULT_BASE_URL;
+    updateCurlPreview();
+    checkHealth();
   </script>
 </body>
 </html>
