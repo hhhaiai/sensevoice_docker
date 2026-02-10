@@ -87,25 +87,69 @@ http://127.0.0.1:7860/
   - `{"event":"end"}` 输出最终结果并结束
   - `{"event":"reset"}` 清空当前会话
 
+### 4.5 curl 调用示例
+
+健康检查：
+
+```bash
+curl -sS http://127.0.0.1:7860/health
+```
+
+PCM 转写（示例发送 1 秒静音）：
+
+```bash
+ffmpeg -f lavfi -i anullsrc=r=16000:cl=mono -t 1 -f s16le -ac 1 -ar 16000 -y /tmp/demo.pcm
+curl -sS -X POST http://127.0.0.1:7860/transcribe/pcm \
+  -H "Content-Type: application/octet-stream" \
+  --data-binary @/tmp/demo.pcm
+```
+
+音频文件转写：
+
+```bash
+curl -sS -X POST http://127.0.0.1:7860/transcribe/file \
+  -F "file=@/path/to/demo.wav;type=audio/wav"
+```
+
 ## 5. Docker 部署
 
-构建镜像：
+### 5.1 本地构建镜像
 
 ```bash
 ./auto_merge.sh
 docker build -t sensevoice-service:local .
 ```
 
-运行容器：
+### 5.2 本地运行容器
 
 ```bash
 docker run --rm -p 7860:7860 sensevoice-service:local
 ```
 
-或使用 compose：
+带环境变量运行（推荐）：
+
+```bash
+docker run --rm -p 7860:7860 \
+  -e PORT=7860 \
+  -e MODEL_PATH=sensevoice-small \
+  -e MAX_CONCURRENT_INFERENCE=2 \
+  -e INFERENCE_TIMEOUT_SEC=45 \
+  sensevoice-service:local
+```
+
+### 5.3 使用 Docker Compose
 
 ```bash
 docker compose up --build
+```
+
+### 5.4 容器运行后快速验证
+
+```bash
+curl -sS http://127.0.0.1:7860/health
+curl -sS -X POST http://127.0.0.1:7860/transcribe/pcm \
+  -H "Content-Type: application/octet-stream" \
+  --data-binary @/dev/null
 ```
 
 ## 6. GitHub Actions 发布到 GHCR
@@ -128,18 +172,24 @@ docker compose up --build
 ghcr.io/<owner>/<repo>
 ```
 
-使用 GHCR 镜像：
+### 6.1 使用 GHCR 镜像
 
 ```bash
 docker pull ghcr.io/<owner>/<repo>:<your-tag>
 docker run --rm -p 7860:7860 ghcr.io/<owner>/<repo>:<your-tag>
 ```
 
-建议使用显式标签拉取，例如：
+建议使用显式标签，例如：
 
 ```bash
 docker pull ghcr.io/<owner>/<repo>:v1.0.0
 docker run --rm -p 7860:7860 ghcr.io/<owner>/<repo>:v1.0.0
+```
+
+如果镜像是私有仓库，先登录：
+
+```bash
+echo <GH_PAT> | docker login ghcr.io -u <github-username> --password-stdin
 ```
 
 ## 7. Hugging Face Spaces 兼容说明

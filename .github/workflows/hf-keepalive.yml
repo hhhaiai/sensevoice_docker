@@ -1,0 +1,35 @@
+name: Keep HF Space Alive
+
+on:
+  schedule:
+    - cron: "*/20 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hf-keepalive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping /health
+        env:
+          HF_SPACE_URL: ${{ vars.HF_SPACE_URL }}
+        run: |
+          set -euo pipefail
+          URL="${HF_SPACE_URL:-https://sanbo1200-sensevoice.hf.space}"
+          URL="${URL%/}"
+          echo "Pinging: ${URL}/health"
+          RESP=$(curl -sS -m 25 -w '\n%{http_code}' "${URL}/health?from=github-actions&ts=$(date +%s)")
+          BODY=$(echo "${RESP}" | sed '$d')
+          CODE=$(echo "${RESP}" | tail -n1)
+          echo "HTTP status: ${CODE}"
+          echo "Response: ${BODY}"
+          if [ "${CODE}" != "200" ]; then
+            exit 1
+          fi

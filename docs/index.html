@@ -201,9 +201,20 @@
       <h2 class="title">接口示例 (curl)</h2>
       <div class="row">
         <button id="copyHealth" class="btn-sub" type="button">复制 Health 命令</button>
+        <button id="copyPcm" class="btn-sub" type="button">复制 PCM 命令</button>
         <button id="copyFile" class="btn-sub" type="button">复制文件转写命令</button>
+        <button id="copyWs" class="btn-sub" type="button">复制 WS 握手命令</button>
       </div>
       <pre id="curlPreview" class="mono"></pre>
+    </section>
+
+    <section class="panel">
+      <h2 class="title">Docker 部署命令</h2>
+      <div class="row">
+        <button id="copyDockerLocal" class="btn-sub" type="button">复制本地 Docker 命令</button>
+        <button id="copyDockerGhcr" class="btn-sub" type="button">复制 GHCR Docker 命令</button>
+      </div>
+      <pre id="dockerPreview" class="mono"></pre>
     </section>
 
     <section class="panel">
@@ -235,8 +246,13 @@
     const finalText = byId("finalText");
     const liveMetrics = byId("liveMetrics");
     const curlPreview = byId("curlPreview");
+    const dockerPreview = byId("dockerPreview");
     const copyHealth = byId("copyHealth");
+    const copyPcm = byId("copyPcm");
     const copyFile = byId("copyFile");
+    const copyWs = byId("copyWs");
+    const copyDockerLocal = byId("copyDockerLocal");
+    const copyDockerGhcr = byId("copyDockerGhcr");
     const logBox = byId("logBox");
 
     let audioContext = null;
@@ -284,8 +300,25 @@
       const base = normalizeBaseUrl(baseUrlInput.value) || DEFAULT_BASE_URL;
       const sample =
 `curl -sS ${base}/health
-curl -sS -X POST ${base}/transcribe/file -F "file=@demo.wav;type=audio/wav"`;
+curl -sS -X POST ${base}/transcribe/pcm -H "Content-Type: application/octet-stream" --data-binary @/tmp/demo.pcm
+curl -sS -X POST ${base}/transcribe/file -F "file=@demo.wav;type=audio/wav"
+curl -i --http1.1 -H "Connection: Upgrade" -H "Upgrade: websocket" ${base}/ws`;
       curlPreview.textContent = sample;
+    }
+
+    function updateDockerPreview() {
+      const local =
+`# 本地构建与运行
+./auto_merge.sh
+docker build -t sensevoice-service:local .
+docker run --rm -p 7860:7860 sensevoice-service:local`;
+
+      const ghcr =
+`# 从 GHCR 拉取并运行
+docker pull ghcr.io/<owner>/<repo>:v1.0.0
+docker run --rm -p 7860:7860 ghcr.io/<owner>/<repo>:v1.0.0`;
+
+      dockerPreview.textContent = `${local}\n\n${ghcr}`;
     }
 
     async function checkHealth() {
@@ -522,14 +555,29 @@ curl -sS -X POST ${base}/transcribe/file -F "file=@demo.wav;type=audio/wav"`;
       const base = normalizeBaseUrl(baseUrlInput.value) || DEFAULT_BASE_URL;
       copyText(`curl -sS ${base}/health`);
     });
+    copyPcm.addEventListener("click", () => {
+      const base = normalizeBaseUrl(baseUrlInput.value) || DEFAULT_BASE_URL;
+      copyText(`curl -sS -X POST ${base}/transcribe/pcm -H "Content-Type: application/octet-stream" --data-binary @/tmp/demo.pcm`);
+    });
     copyFile.addEventListener("click", () => {
       const base = normalizeBaseUrl(baseUrlInput.value) || DEFAULT_BASE_URL;
       copyText(`curl -sS -X POST ${base}/transcribe/file -F "file=@demo.wav;type=audio/wav"`);
+    });
+    copyWs.addEventListener("click", () => {
+      const base = normalizeBaseUrl(baseUrlInput.value) || DEFAULT_BASE_URL;
+      copyText(`curl -i --http1.1 -H "Connection: Upgrade" -H "Upgrade: websocket" -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" ${base}/ws`);
+    });
+    copyDockerLocal.addEventListener("click", () => {
+      copyText(`./auto_merge.sh\ndocker build -t sensevoice-service:local .\ndocker run --rm -p 7860:7860 sensevoice-service:local`);
+    });
+    copyDockerGhcr.addEventListener("click", () => {
+      copyText(`docker pull ghcr.io/<owner>/<repo>:v1.0.0\ndocker run --rm -p 7860:7860 ghcr.io/<owner>/<repo>:v1.0.0`);
     });
 
     const savedUrl = localStorage.getItem("sensevoice_demo_base_url");
     baseUrlInput.value = normalizeBaseUrl(savedUrl) || DEFAULT_BASE_URL;
     updateCurlPreview();
+    updateDockerPreview();
     checkHealth();
   </script>
 </body>
