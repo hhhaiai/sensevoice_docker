@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SenseVoice 语音转文字</title>
+  <style>
+    :root {
+      --bg: #f4f7f9;
+      --card: #ffffff;
+      --text: #10212b;
+      --muted: #5a6d78;
+      --primary: #0f766e;
+      --primary-soft: #d6f5ef;
+      --danger: #b42318;
+      --border: #d4e0e7;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: radial-gradient(circle at top right, #d8efe9 0%, var(--bg) 45%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 24px 16px 40px;
+    }
+    .title {
+      margin: 0 0 12px;
+      font-size: 28px;
+      font-weight: 700;
+    }
+    .subtitle {
+      margin: 0 0 20px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+    @media (min-width: 860px) {
+      .grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 8px 24px rgba(16, 33, 43, 0.06);
+    }
+    .card h2 {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+    .status {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--primary-soft);
+      color: var(--primary);
+      margin-bottom: 12px;
+    }
+    .status.down {
+      background: #fde7e7;
+      color: var(--danger);
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    input[type="file"] {
+      width: 100%;
+      font-size: 14px;
+    }
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 14px;
+      transition: transform .08s ease;
+    }
+    button:active { transform: translateY(1px); }
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+    }
+    .btn-ghost {
+      background: #ebf2f6;
+      color: #28414f;
+    }
+    textarea, pre {
+      width: 100%;
+      min-height: 110px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      background: #fcfeff;
+      font-size: 14px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 8px 0 0;
+    }
+    .metrics {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .tips {
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="title">SenseVoice 语音转文字服务</h1>
+    <p class="subtitle">支持音频文件转写 + 浏览器实时语音转写（16kHz 单声道 PCM）</p>
+    <span id="healthStatus" class="status">检查服务中...</span>
+
+    <div class="grid">
+      <section class="card">
+        <h2>音频文件转写</h2>
+        <div class="row">
+          <input id="audioFile" type="file" accept="audio/*">
+        </div>
+        <div class="row">
+          <button id="fileBtn" class="btn-primary" type="button">上传并转写</button>
+        </div>
+        <div class="metrics" id="fileMetrics"></div>
+        <pre id="fileResult"></pre>
+      </section>
+
+      <section class="card">
+        <h2>实时语音转写</h2>
+        <div class="row">
+          <button id="startBtn" class="btn-primary" type="button">开始录音</button>
+          <button id="stopBtn" class="btn-ghost" type="button">停止并输出最终结果</button>
+          <button id="resetBtn" class="btn-ghost" type="button">重置</button>
+        </div>
+        <div class="metrics" id="liveMetrics"></div>
+        <label>实时文本：</label>
+        <textarea id="partialText" readonly></textarea>
+        <label>最终文本：</label>
+        <textarea id="finalText" readonly></textarea>
+      </section>
+    </div>
+
+    <p class="tips">建议使用 Chrome 或 Edge，首次使用请允许麦克风权限。</p>
+  </div>
+
+  <script>
+    const healthStatus = document.getElementById("healthStatus");
+    const fileInput = document.getElementById("audioFile");
+    const fileBtn = document.getElementById("fileBtn");
+    const fileResult = document.getElementById("fileResult");
+    const fileMetrics = document.getElementById("fileMetrics");
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const partialText = document.getElementById("partialText");
+    const finalText = document.getElementById("finalText");
+    const liveMetrics = document.getElementById("liveMetrics");
+
+    let audioContext = null;
+    let mediaStream = null;
+    let sourceNode = null;
+    let processorNode = null;
+    let websocket = null;
+    let lastLatency = 0;
+    let lastRtf = 0;
+
+    async function checkHealth() {
+      try {
+        const resp = await fetch("/health");
+        const data = await resp.json();
+        if (resp.ok && data.ready) {
+          healthStatus.textContent = `服务正常 | 模型: ${data.model_name} | 运行: ${data.uptime_sec}s`;
+          healthStatus.classList.remove("down");
+        } else {
+          healthStatus.textContent = "服务未就绪";
+          healthStatus.classList.add("down");
+        }
+      } catch (err) {
+        healthStatus.textContent = `服务不可达: ${err.message}`;
+        healthStatus.classList.add("down");
+      }
+    }
+
+    function downsampleBuffer(buffer, inputRate, targetRate) {
+      if (targetRate === inputRate) return buffer;
+      if (targetRate > inputRate) throw new Error("目标采样率不能高于输入采样率");
+      const ratio = inputRate / targetRate;
+      const newLength = Math.round(buffer.length / ratio);
+      const result = new Float32Array(newLength);
+      let offsetResult = 0;
+      let offsetBuffer = 0;
+      while (offsetResult < result.length) {
+        const nextOffsetBuffer = Math.round((offsetResult + 1) * ratio);
+        let accum = 0;
+        let count = 0;
+        for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i += 1) {
+          accum += buffer[i];
+          count += 1;
+        }
+        result[offsetResult] = count > 0 ? accum / count : 0;
+        offsetResult += 1;
+        offsetBuffer = nextOffsetBuffer;
+      }
+      return result;
+    }
+
+    function floatTo16BitPCM(float32Array) {
+      const out = new Int16Array(float32Array.length);
+      for (let i = 0; i < float32Array.length; i += 1) {
+        const s = Math.max(-1, Math.min(1, float32Array[i]));
+        out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+      }
+      return out;
+    }
+
+    function wsUrl() {
+      const scheme = location.protocol === "https:" ? "wss" : "ws";
+      return `${scheme}://${location.host}/ws/transcribe`;
+    }
+
+    function stopAudioGraph() {
+      if (processorNode) {
+        processorNode.disconnect();
+        processorNode.onaudioprocess = null;
+        processorNode = null;
+      }
+      if (sourceNode) {
+        sourceNode.disconnect();
+        sourceNode = null;
+      }
+      if (mediaStream) {
+        mediaStream.getTracks().forEach((track) => track.stop());
+        mediaStream = null;
+      }
+      if (audioContext) {
+        audioContext.close();
+        audioContext = null;
+      }
+    }
+
+    async function startRealtime() {
+      if (websocket && websocket.readyState === WebSocket.OPEN) return;
+      partialText.value = "";
+      finalText.value = "";
+      liveMetrics.textContent = "正在建立连接...";
+      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      sourceNode = audioContext.createMediaStreamSource(mediaStream);
+      processorNode = audioContext.createScriptProcessor(4096, 1, 1);
+      const silentGain = audioContext.createGain();
+      silentGain.gain.value = 0;
+
+      websocket = new WebSocket(wsUrl());
+      websocket.binaryType = "arraybuffer";
+      websocket.onopen = () => {
+        liveMetrics.textContent = "实时转写中...";
+      };
+      websocket.onerror = () => {
+        liveMetrics.textContent = "WebSocket 连接错误";
+      };
+      websocket.onclose = () => {
+        liveMetrics.textContent = "实时连接已关闭";
+      };
+      websocket.onmessage = (evt) => {
+        try {
+          const data = JSON.parse(evt.data);
+          if (data.event === "partial") {
+            partialText.value = data.text || "";
+            lastLatency = data.latency_ms || 0;
+            lastRtf = data.rtf || 0;
+            liveMetrics.textContent = `实时中 | 延迟 ${lastLatency}ms | RTF ${lastRtf}`;
+          } else if (data.event === "final") {
+            const previous = finalText.value ? `${finalText.value}\n` : "";
+            finalText.value = `${previous}${data.text || ""}`.trim();
+            partialText.value = "";
+            liveMetrics.textContent = `已输出最终结果 | 延迟 ${data.latency_ms || 0}ms | RTF ${data.rtf || 0}`;
+          } else if (data.event === "error") {
+            liveMetrics.textContent = `错误: ${data.detail || "unknown"}`;
+          }
+        } catch (err) {
+          liveMetrics.textContent = `消息解析失败: ${err.message}`;
+        }
+      };
+
+      processorNode.onaudioprocess = (event) => {
+        if (!websocket || websocket.readyState !== WebSocket.OPEN) return;
+        const input = event.inputBuffer.getChannelData(0);
+        const downsampled = downsampleBuffer(input, audioContext.sampleRate, 16000);
+        const pcm = floatTo16BitPCM(downsampled);
+        websocket.send(pcm.buffer);
+      };
+
+      sourceNode.connect(processorNode);
+      processorNode.connect(silentGain);
+      silentGain.connect(audioContext.destination);
+    }
+
+    function stopRealtime() {
+      if (websocket && websocket.readyState === WebSocket.OPEN) {
+        websocket.send(JSON.stringify({ event: "end" }));
+        setTimeout(() => {
+          if (websocket && websocket.readyState === WebSocket.OPEN) websocket.close();
+        }, 120);
+      }
+      stopAudioGraph();
+    }
+
+    function resetRealtime() {
+      partialText.value = "";
+      finalText.value = "";
+      liveMetrics.textContent = "已重置";
+      if (websocket && websocket.readyState === WebSocket.OPEN) {
+        websocket.send(JSON.stringify({ event: "reset" }));
+      }
+    }
+
+    async function doFileTranscribe() {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) {
+        fileResult.textContent = "请先选择一个音频文件";
+        return;
+      }
+      fileBtn.disabled = true;
+      fileResult.textContent = "转写处理中...";
+      fileMetrics.textContent = "";
+      const form = new FormData();
+      form.append("file", file);
+      try {
+        const resp = await fetch("/api/transcribe/file", { method: "POST", body: form });
+        const data = await resp.json();
+        if (!resp.ok) {
+          fileResult.textContent = `失败: ${data.detail || JSON.stringify(data)}`;
+          return;
+        }
+        fileResult.textContent = data.text || "";
+        fileMetrics.textContent = `文件: ${data.filename || file.name} | 时长: ${data.audio_duration || 0}s | 推理耗时: ${data.latency_ms || 0}ms | RTF: ${data.rtf || 0}`;
+      } catch (err) {
+        fileResult.textContent = `请求失败: ${err.message}`;
+      } finally {
+        fileBtn.disabled = false;
+      }
+    }
+
+    fileBtn.addEventListener("click", doFileTranscribe);
+    startBtn.addEventListener("click", startRealtime);
+    stopBtn.addEventListener("click", stopRealtime);
+    resetBtn.addEventListener("click", resetRealtime);
+    checkHealth();
+    setInterval(checkHealth, 10000);
+  </script>
+</body>
+</html>

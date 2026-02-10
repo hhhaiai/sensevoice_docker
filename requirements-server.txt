@@ -1,0 +1,6 @@
+funasr_onnx>=0.1.0
+onnxruntime>=1.14.0
+fastapi>=0.95.0
+uvicorn[standard]>=0.22.0
+python-multipart>=0.0.6
+numpy>=1.23.0

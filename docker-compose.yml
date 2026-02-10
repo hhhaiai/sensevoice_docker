@@ -1,0 +1,14 @@
+version: "3.9"
+services:
+  sensevoice:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sensevoice-service:local
+    ports:
+      - "8008:8008"
+    environment:
+      - MODEL_PATH=sensevoice-small
+      - LOG_LEVEL=INFO
+      - MAX_CONCURRENT_INFERENCE=2
+      - INFERENCE_TIMEOUT_SEC=45
